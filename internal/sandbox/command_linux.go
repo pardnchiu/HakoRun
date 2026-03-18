@@ -1,3 +1,5 @@
+//go:build linux
+
 package sandbox
 
 import (
@@ -6,19 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-)
-
-var (
-	extMap = map[string]string{
-		"python":     ".py",
-		"javascript": ".js",
-		"typescript": ".ts",
-	}
-	runtimeMap = map[string]string{
-		"python":     "python3",
-		"javascript": "node",
-		"typescript": "tsx",
-	}
 )
 
 func SandboxCommand(ctx context.Context, lang string) (*exec.Cmd, error) {

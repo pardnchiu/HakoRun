@@ -9,18 +9,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/joho/godotenv"
 	"github.com/pardnchiu/go-faas/internal"
 	"github.com/pardnchiu/go-faas/internal/checker"
 	"github.com/pardnchiu/go-faas/internal/database"
 	"github.com/pardnchiu/go-faas/internal/sandbox"
 )
-
-func init() {
-	if err := godotenv.Load(); err != nil {
-		slog.Warn("failed to find .env, using system environment variables")
-	}
-}
 
 func main() {
 	err := checker.CheckPackage()

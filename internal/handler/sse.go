@@ -64,7 +64,7 @@ func sendDone(w http.ResponseWriter, flusher http.Flusher, event, msg string) {
 func runScriptWithSSE(code, lang, input string, w http.ResponseWriter, flusher http.Flusher, clientCtx context.Context) (string, error) {
 	if timeoutScript == 0 {
 		timeoutScript = time.Duration(utils.GetWithDefaultInt("TIMEOUT_SCRIPT", 30)) * time.Second
-		timeoutRequest = timeoutScript + timeoutRedis
+		timeoutRequest = timeoutScript + timeoutDB
 	}
 
 	ctx, execCancel := context.WithTimeout(context.Background(), timeoutRequest)

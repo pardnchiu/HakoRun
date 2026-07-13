@@ -65,7 +65,7 @@ func SandboxCommand(ctx context.Context, lang string) (*exec.Cmd, error) {
 
 	args := []string{
 		"--scope", "--user", "--quiet",
-		"--slice=go-faas-slice",
+		"--slice=hakorun.slice",
 		"--",
 		"bwrap",
 	}

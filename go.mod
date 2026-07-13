@@ -1,4 +1,4 @@
-module github.com/pardnchiu/go-faas
+module github.com/pardnchiu/HakoRun
 
 go 1.25.0
 

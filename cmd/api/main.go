@@ -9,10 +9,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/pardnchiu/go-faas/internal"
-	"github.com/pardnchiu/go-faas/internal/checker"
-	"github.com/pardnchiu/go-faas/internal/database"
-	"github.com/pardnchiu/go-faas/internal/sandbox"
+	"github.com/pardnchiu/HakoRun/internal"
+	"github.com/pardnchiu/HakoRun/internal/checker"
+	"github.com/pardnchiu/HakoRun/internal/database"
+	"github.com/pardnchiu/HakoRun/internal/sandbox"
 )
 
 func main() {

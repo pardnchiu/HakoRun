@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pardnchiu/go-faas/internal/sandbox"
-	"github.com/pardnchiu/go-faas/internal/utils"
+	"github.com/pardnchiu/HakoRun/internal/sandbox"
+	"github.com/pardnchiu/HakoRun/internal/utils"
 )
 
 type SSE struct {

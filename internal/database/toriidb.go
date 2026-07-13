@@ -29,7 +29,7 @@ func newToriiBackend() (*toriiBackend, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get home directory: %w", err)
 	}
-	dir := filepath.Join(homeDir, ".config", "pardnchiu", "go-faas")
+	dir := filepath.Join(homeDir, ".config", "pardnchiu", "hakorun")
 
 	s, err := store.New(dir)
 	if err != nil {

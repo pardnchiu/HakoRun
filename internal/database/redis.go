@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pardnchiu/go-faas/internal/utils"
+	"github.com/pardnchiu/HakoRun/internal/utils"
 	"github.com/redis/go-redis/v9"
 )
 

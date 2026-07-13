@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/pardnchiu/go-faas/internal/database"
+	"github.com/pardnchiu/HakoRun/internal/database"
 )
 
 type UploadRequest struct {

@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/pardnchiu/go-faas/internal/handler"
-	"github.com/pardnchiu/go-faas/internal/utils"
+	"github.com/pardnchiu/HakoRun/internal/handler"
+	"github.com/pardnchiu/HakoRun/internal/utils"
 )
 
 func CreateServer() *http.Server {

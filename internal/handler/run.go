@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/pardnchiu/go-faas/internal/database"
-	"github.com/pardnchiu/go-faas/internal/sandbox"
-	"github.com/pardnchiu/go-faas/internal/utils"
+	"github.com/pardnchiu/HakoRun/internal/database"
+	"github.com/pardnchiu/HakoRun/internal/sandbox"
+	"github.com/pardnchiu/HakoRun/internal/utils"
 )
 
 type RunBody struct {

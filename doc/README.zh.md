@@ -1,116 +1,68 @@
 > [!NOTE]
-> 此 README 由 [SKILL](https://github.com/pardnchiu/skill-readme-generate) 生成，英文版請參閱 [這裡](../README.md)。
+> 此 README 由 [SKILL](https://github.com/agenvoy/skill-readme-generate) 生成，英文版請參閱 [這裡](../README.md)。
 
-![cover](./cover.png)
+***
 
-# go-faas
+<p align="center">
+<strong>SECURE MULTI-LANGUAGE FAAS WITH SANDBOXED EXECUTION</strong>
+</p>
 
-[![pkg](https://pkg.go.dev/badge/github.com/pardnchiu/go-faas.svg)](https://pkg.go.dev/github.com/pardnchiu/go-faas)
-[![card](https://goreportcard.com/badge/github.com/pardnchiu/go-faas)](https://goreportcard.com/report/github.com/pardnchiu/go-faas)
-[![license](https://img.shields.io/github/license/pardnchiu/go-faas)](LICENSE)
-[![version](https://img.shields.io/github/v/tag/pardnchiu/go-faas?label=release)](https://github.com/pardnchiu/go-faas/releases)
+<p align="center">
+<a href="https://github.com/pardnchiu/go-faas/releases"><img src="https://img.shields.io/github/v/tag/pardnchiu/go-faas?include_prereleases&style=for-the-badge" alt="Release"></a>
+<a href="LICENSE"><img src="https://img.shields.io/github/license/pardnchiu/go-faas?include_prereleases&style=for-the-badge" alt="License"></a>
+</p>
 
-> 輕量級 Function-as-a-Service 平台，透過 HTTP API 接收程式碼並在 Bubblewrap 沙箱中安全執行。
+***
+
+> Go FaaS 平台，具備 Bubblewrap 沙箱、Redis 腳本版本控管與 SSE 串流
 
 ## 目錄
 
 - [功能特點](#功能特點)
 - [架構](#架構)
-- [檔案結構](#檔案結構)
 - [授權](#授權)
 - [Author](#author)
-- [Stars](#stars)
 
 ## 功能特點
 
 > `go install github.com/pardnchiu/go-faas/cmd/api@latest` · [完整文件](./doc.zh.md)
 
-### Bubblewrap 沙箱隔離
-
-所有使用者提交的程式碼皆在 Bubblewrap 沙箱中執行，透過 Linux Namespace 隔離檔案系統、網路與行程空間，並移除全部 Capability。沙箱內僅掛載唯讀的系統路徑與 Wrapper 腳本，確保使用者程式碼無法存取主機資源或對外連線。
-
-### 多語言即時執行與版本管理
-
-支援 Python、JavaScript、TypeScript 三種語言的程式碼提交與執行。腳本透過 Redis 進行版本化儲存，每次上傳自動產生時間戳版本號，執行時可指定特定版本或自動取用最新版本，實現函式的持續迭代與回溯。
-
-### Systemd Slice 資源管控
-
-每個沙箱行程由 systemd-run 啟動並歸屬至自訂的 systemd slice，強制限制 CPU 配額與記憶體上限。當腳本超出資源限制時由系統層級直接終止，避免單一執行影響整體服務穩定性。
+- **Bubblewrap 沙箱隔離** — 使用者程式碼在 bwrap 下以 namespace 隔離執行，移除全部 Capability，無法存取主機或對外連線。
+- **多語言版本化腳本** — 透過 HTTP 上傳 Python、JavaScript、TypeScript 至 Redis，以時間戳版本管理，可指定版本或取最新。
+- **Systemd Slice 資源上限** — 每個沙箱由 systemd-run 歸屬自訂 slice，強制限制 CPU 配額與記憶體上限。
+- **SSE 串流執行** — 以 Server-Sent Events 即時推送中間 log 與最終結果，適合長時間或漸進輸出腳本。
+- **立即 Run-Now 模式** — 不經儲存即可執行臨時程式碼，方便快速試驗與一次性任務。
 
 ## 架構
 
+> [完整架構](./architecture.zh.md)
+
 ```mermaid
 graph TB
-    Client[HTTP Client] -->|POST /upload| Upload[Upload Handler]
+    Client[HTTP 客戶端] -->|POST /upload| Upload[Upload Handler]
     Client -->|POST /run/*path| Run[Run Handler]
     Client -->|POST /run-now| RunNow[RunNow Handler]
-
-    Upload -->|儲存腳本| Redis[(Redis)]
-    Run -->|取得腳本| Redis
-    Run --> Sandbox
+    Upload --> Redis[(Redis)]
+    Run --> Redis
+    Run --> Sandbox[沙箱]
     RunNow --> Sandbox
-
-    subgraph Sandbox[Bubblewrap 沙箱]
-        SystemdRun[systemd-run] --> Bwrap[bwrap]
-        Bwrap --> Wrapper[Wrapper Script]
-        Wrapper --> UserCode[使用者程式碼]
-    end
-
-    Sandbox -->|stdout/stderr| SSE[SSE Stream / JSON Response]
-    SSE --> Client
-```
-
-## 檔案結構
-
-```
-go-faas/
-├── cmd/
-│   └── api/
-│       └── main.go              # 進入點
-├── internal/
-│   ├── router.go                # HTTP 路由定義
-│   ├── checker/
-│   │   └── checker.go           # 相依套件檢查與自動安裝
-│   ├── database/
-│   │   └── redis.go             # Redis 腳本儲存與版本管理
-│   ├── handler/
-│   │   ├── run.go               # 程式碼執行 Handler
-│   │   ├── upload.go            # 腳本上傳 Handler
-│   │   └── sse.go               # SSE 串流輸出
-│   ├── sandbox/
-│   │   ├── command.go           # Bubblewrap 沙箱指令建構
-│   │   └── slice.go             # Systemd Slice 資源限制
-│   ├── resource/
-│   │   ├── wrapper.py           # Python Wrapper
-│   │   ├── wrapper.js           # JavaScript Wrapper
-│   │   └── wrapper.ts           # TypeScript Wrapper
-│   └── utils/
-│       └── getEnv.go            # 環境變數輔助函式
-├── .env.example
-├── go.mod
-└── LICENSE
+    Sandbox --> Response[JSON / SSE]
+    Response --> Client
 ```
 
 ## 授權
 
-本專案採用 [MIT LICENSE](LICENSE)。
+本專案採用 [GNU Affero General Public License v3.0](../LICENSE)。
 
 ## Author
 
-<img src="https://avatars.githubusercontent.com/u/25631760" align="left" width="96" height="96" style="margin-right: 0.5rem;">
+<img src="https://github.com/pardnchiu.png" align="left" width="96" height="96" style="margin-right: 0.5rem;">
 
 <h4 style="padding-top: 0">邱敬幃 Pardn Chiu</h4>
 
-<a href="mailto:dev@pardn.io" target="_blank">
-<img src="https://pardn.io/image/email.svg" width="48" height="48">
-</a> <a href="https://linkedin.com/in/pardnchiu" target="_blank">
-<img src="https://pardn.io/image/linkedin.svg" width="48" height="48">
-</a>
-
-## Stars
-
-[![Star](https://api.star-history.com/svg?repos=pardnchiu/go-faas&type=Date)](https://www.star-history.com/#pardnchiu/go-faas&Date)
+<a href="mailto:hi@pardn.io">hi@pardn.io</a><br>
+<a href="https://www.linkedin.com/in/pardnchiu">https://www.linkedin.com/in/pardnchiu</a>
 
 ***
 
-©️ 2025 [邱敬幃 Pardn Chiu](https://linkedin.com/in/pardnchiu)
+©️ 2025 [邱敬幃 Pardn Chiu](https://www.linkedin.com/in/pardnchiu)

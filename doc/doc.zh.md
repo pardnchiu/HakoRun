@@ -5,16 +5,16 @@
 ## 前置需求
 
 - Go 1.23 或更高版本
-- Linux 作業系統（Ubuntu、Debian、Fedora、Arch Linux、Alpine Linux）
+- Linux（Ubuntu、Debian、Fedora、Arch Linux、Alpine Linux；生產沙箱以 Linux 為主）
 - Redis 伺服器
 - Bubblewrap（`bwrap`）
-- Node.js（含 npm）
+- Node.js（含 npm）與 TypeScript 執行環境（`tsx`）
 - Python 3
-- systemd（用於 slice 資源管控）
+- systemd（Slice 資源管控）
 
 ## 安裝
 
-### 從原始碼建置
+### 從原始碼
 
 ```bash
 git clone https://github.com/pardnchiu/go-faas.git
@@ -34,13 +34,13 @@ go install github.com/pardnchiu/go-faas/cmd/api@latest
 npm install
 ```
 
-> 首次啟動時，程式會自動檢查 `bwrap`、`node`、`python3` 是否存在，若缺少會嘗試透過系統套件管理器自動安裝。
+> 首次啟動時，程式會檢查 `bwrap`、`node`、`python3` 等相依；若缺失，會嘗試透過系統套件管理器安裝。
 
 ## 設定
 
 ### 環境變數
 
-複製 `.env.example` 並填入對應值：
+複製 `.env.example` 並填入值：
 
 ```bash
 cp .env.example .env
@@ -51,25 +51,25 @@ cp .env.example .env
 | `HTTP_PORT` | 否 | `8080` | HTTP 服務埠號 |
 | `MAX_CPUS` | 否 | `1` | 沙箱 CPU 配額（核心數） |
 | `MAX_MEMORY` | 否 | `128M` | 沙箱記憶體上限 |
-| `CODE_MAX_SIZE` | 否 | `262144`（256KB） | 程式碼最大允許大小（Bytes） |
-| `TIMEOUT_SCRIPT` | 否 | `30` | 腳本執行逾時秒數 |
-| `REDIS_HOST` | 否 | `localhost` | Redis 主機位址 |
-| `REDIS_PORT` | 否 | `6379` | Redis 連接埠 |
-| `REDIS_PASSWORD` | 否 | 空字串 | Redis 密碼 |
+| `CODE_MAX_SIZE` | 否 | `262144`（256KB） | 允許的最大程式碼位元組數 |
+| `TIMEOUT_SCRIPT` | 否 | `30` | 腳本執行逾時（秒） |
+| `REDIS_HOST` | 否 | `localhost` | Redis 主機 |
+| `REDIS_PORT` | 否 | `6379` | Redis 埠號 |
+| `REDIS_PASSWORD` | 否 | 空 | Redis 密碼 |
 | `REDIS_DB` | 否 | `0` | Redis 資料庫編號 |
-| `REDIS_TIMEOUT_SECONDS` | 否 | `5` | Redis 連線逾時秒數 |
+| `REDIS_TIMEOUT_SECONDS` | 否 | `5` | Redis 連線逾時（秒） |
 
 ## 使用方式
 
-### 啟動服務
+### 啟動伺服器
 
 ```bash
 ./go-faas
 ```
 
-### 上傳腳本
+### 基礎：上傳腳本
 
-將腳本儲存至 Redis 並取得版本號：
+將腳本存入 Redis 並取得版本號：
 
 ```bash
 curl -X POST http://localhost:8080/upload \
@@ -91,9 +91,9 @@ curl -X POST http://localhost:8080/upload \
 }
 ```
 
-### 執行已儲存的腳本
+### 基礎：執行已儲存腳本
 
-透過路徑執行最新版本：
+執行路徑的最新版本：
 
 ```bash
 curl -X POST http://localhost:8080/run/math/add \
@@ -103,7 +103,7 @@ curl -X POST http://localhost:8080/run/math/add \
   }'
 ```
 
-指定版本執行：
+指定版本：
 
 ```bash
 curl -X POST "http://localhost:8080/run/math/add?version=1739000000" \
@@ -122,9 +122,7 @@ curl -X POST "http://localhost:8080/run/math/add?version=1739000000" \
 }
 ```
 
-### 即時執行程式碼
-
-不儲存，直接提交程式碼執行：
+### 進階：立即執行（不儲存）
 
 ```bash
 curl -X POST http://localhost:8080/run-now \
@@ -145,9 +143,9 @@ curl -X POST http://localhost:8080/run-now \
 }
 ```
 
-### SSE 串流模式
+### 進階：SSE 串流模式
 
-設定 `stream: true` 啟用 Server-Sent Events 串流輸出：
+設定 `stream: true` 啟用 Server-Sent Events：
 
 ```bash
 curl -X POST http://localhost:8080/run-now \
@@ -177,18 +175,18 @@ data: {"event":"result","data":"done","type":"string"}
 | 方法 | 路徑 | 說明 |
 |------|------|------|
 | `POST` | `/upload` | 上傳腳本至 Redis |
-| `POST` | `/run/*targetPath` | 執行已儲存的腳本 |
-| `POST` | `/run-now` | 即時執行提交的程式碼 |
+| `POST` | `/run/*targetPath` | 執行已儲存腳本 |
+| `POST` | `/run-now` | 立即執行提交的程式碼 |
 
 ### POST /upload
 
-上傳腳本並儲存至 Redis，回傳版本號。
+上傳並儲存腳本，回傳版本號。
 
 **Request Body：**
 
 | 欄位 | 型別 | 必要 | 說明 |
 |------|------|------|------|
-| `path` | `string` | 是 | 腳本存取路徑（不可包含 `..`） |
+| `path` | `string` | 是 | 腳本存取路徑（不得含 `..`） |
 | `code` | `string` | 是 | 程式碼內容 |
 | `language` | `string` | 是 | 語言（`python`、`javascript`、`typescript`） |
 
@@ -210,18 +208,18 @@ data: {"event":"result","data":"done","type":"string"}
 
 | 參數 | 型別 | 必要 | 說明 |
 |------|------|------|------|
-| `version` | `int64` | 否 | 指定版本號，省略時使用最新版本 |
+| `version` | `int64` | 否 | 目標版本；預設最新 |
 
 **Request Body：**
 
 | 欄位 | 型別 | 必要 | 說明 |
 |------|------|------|------|
-| `input` | `string` | 否 | JSON 格式的輸入資料，腳本中以 `event` 存取 |
+| `input` | `string` | 否 | JSON 字串輸入，腳本內以 `event` 存取 |
 | `stream` | `bool` | 否 | 啟用 SSE 串流輸出 |
 
 ### POST /run-now
 
-直接提交程式碼於沙箱中執行，不經 Redis 儲存。
+不經 Redis 直接提交程式碼至沙箱執行。
 
 **Request Body：**
 
@@ -229,19 +227,19 @@ data: {"event":"result","data":"done","type":"string"}
 |------|------|------|------|
 | `code` | `string` | 是 | 程式碼內容 |
 | `language` | `string` | 是 | 語言（`python`、`javascript`、`typescript`） |
-| `input` | `string` | 否 | JSON 格式的輸入資料 |
+| `input` | `string` | 否 | JSON 字串輸入 |
 | `stream` | `bool` | 否 | 啟用 SSE 串流輸出 |
 
-### Response 格式
+### 回應格式
 
-標準回應根據回傳資料型別自動判斷：
+標準回應會自動判斷回傳資料型別：
 
 | `type` | 說明 |
 |--------|------|
-| `string` | 字串值 |
+| `string` | 字串 |
 | `number` | 數值 |
 | `json` | JSON 物件或陣列 |
-| `text` | 純文字（無法解析為 JSON） |
+| `text` | 純文字（非合法 JSON） |
 
 ### SSE 事件格式
 
@@ -253,12 +251,12 @@ data: {"event":"result","data":"done","type":"string"}
 
 ### 支援語言
 
-| 語言 | Runtime | 副檔名 | 腳本中可用的全域變數 |
-|------|---------|--------|---------------------|
+| 語言 | Runtime | 副檔名 | 腳本內全域變數 |
+|------|---------|--------|----------------|
 | Python | `python3` | `.py` | `event`、`input` |
 | JavaScript | `node` | `.js` | `event`、`input` |
 | TypeScript | `tsx` | `.ts` | `event`、`input` |
 
 ***
 
-©️ 2025 [邱敬幃 Pardn Chiu](https://linkedin.com/in/pardnchiu)
+©️ 2025 [邱敬幃 Pardn Chiu](https://www.linkedin.com/in/pardnchiu)

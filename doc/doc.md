@@ -5,10 +5,10 @@
 ## Prerequisites
 
 - Go 1.23 or higher
-- Linux operating system (Ubuntu, Debian, Fedora, Arch Linux, Alpine Linux)
+- Linux (Ubuntu, Debian, Fedora, Arch Linux, Alpine Linux; production sandbox targets Linux)
 - Redis server
 - Bubblewrap (`bwrap`)
-- Node.js (with npm)
+- Node.js (with npm) and TypeScript runtime (`tsx`)
 - Python 3
 - systemd (for slice resource control)
 
@@ -34,7 +34,7 @@ go install github.com/pardnchiu/go-faas/cmd/api@latest
 npm install
 ```
 
-> On first launch, the program automatically checks whether `bwrap`, `node`, and `python3` are present. If any are missing, it attempts to install them via the system package manager.
+> On first launch, the program checks for `bwrap`, `node`, and `python3`. If any are missing, it attempts to install them via the system package manager.
 
 ## Configuration
 
@@ -67,7 +67,7 @@ cp .env.example .env
 ./go-faas
 ```
 
-### Upload a Script
+### Basic: Upload a Script
 
 Store a script in Redis and receive a version number:
 
@@ -91,7 +91,7 @@ Response:
 }
 ```
 
-### Execute a Stored Script
+### Basic: Execute a Stored Script
 
 Run the latest version by path:
 
@@ -122,7 +122,7 @@ Response:
 }
 ```
 
-### Execute Code Immediately
+### Advanced: Execute Code Immediately
 
 Submit code for direct execution without storing:
 
@@ -145,7 +145,7 @@ Response:
 }
 ```
 
-### SSE Streaming Mode
+### Advanced: SSE Streaming Mode
 
 Set `stream: true` to enable Server-Sent Events streaming output:
 
@@ -261,4 +261,4 @@ Standard responses auto-detect the return data type:
 
 ***
 
-©️ 2025 [邱敬幃 Pardn Chiu](https://linkedin.com/in/pardnchiu)
+©️ 2025 [邱敬幃 Pardn Chiu](https://www.linkedin.com/in/pardnchiu)

@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/pardnchiu/go-faas/internal/database"
-	"github.com/pardnchiu/go-faas/internal/sandbox"
-	"github.com/pardnchiu/go-faas/internal/utils"
+	"github.com/pardnchiu/HakoRun/internal/database"
+	"github.com/pardnchiu/HakoRun/internal/sandbox"
+	"github.com/pardnchiu/HakoRun/internal/utils"
 )
 
 type RunBody struct {
@@ -25,7 +25,7 @@ type RunBody struct {
 }
 
 var (
-	timeoutRedis    = 5 * time.Second
+	timeoutDB    = 5 * time.Second
 	timeoutScript   time.Duration
 	timeoutRequest  time.Duration
 	codeMaxSize     int64
@@ -62,7 +62,7 @@ func Run(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeoutRedis)
+	ctx, cancel := context.WithTimeout(context.Background(), timeoutDB)
 	defer cancel()
 
 	script, err := database.DB.Get(ctx, targetPath, version)
@@ -192,7 +192,7 @@ func setStream(c *gin.Context) (http.Flusher, bool) {
 func runScript(code, lang, input string) (string, error) {
 	if timeoutScript == 0 {
 		timeoutScript = time.Duration(utils.GetWithDefaultInt("TIMEOUT_SCRIPT", 30)) * time.Second
-		timeoutRequest = timeoutScript + timeoutRedis
+		timeoutRequest = timeoutScript + timeoutDB
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeoutRequest)

@@ -8,7 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/pardnchiu/go-faas/internal/utils"
+	"github.com/pardnchiu/HakoRun/internal/utils"
 )
 
 func NewSlice() error {
@@ -27,13 +27,13 @@ MemorySwapMax=0
 	folderPath := filepath.Join(os.Getenv("HOME"), ".config/systemd/user")
 	os.MkdirAll(folderPath, 0755)
 
-	path := filepath.Join(folderPath, "go-faas-slice")
+	path := filepath.Join(folderPath, "hakorun.slice")
 	if err := os.WriteFile(path, []byte(sliceContent), 0644); err != nil {
 		return err
 	}
 
 	exec.Command("systemctl", "--user", "daemon-reload").Run()
-	exec.Command("systemctl", "--user", "start", "go-faas-slice").Run()
+	exec.Command("systemctl", "--user", "start", "hakorun.slice").Run()
 
 	return nil
 }

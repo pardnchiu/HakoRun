@@ -1,46 +1,62 @@
-# go-faas - Documentation
+# HakoRun - Documentation
+
+Last updated: 2026-10-06
 
 > Back to [README](../README.md)
 
 ## Prerequisites
 
-- Go 1.23 or higher
-- Linux (Ubuntu, Debian, Fedora, Arch Linux, Alpine Linux; production sandbox targets Linux)
-- Redis server
-- Bubblewrap (`bwrap`)
-- Node.js (with npm) and TypeScript runtime (`tsx`)
-- Python 3
-- systemd (for slice resource control)
+- Go 1.25 or higher
+- One of the following operating systems:
+  - Linux: `bwrap` (Bubblewrap), `systemd-run`, and a working systemd user session
+  - macOS: the built-in `sandbox-exec`
+- Python 3 (`python3`)
+- Node.js and npm
+- TypeScript runtime: global `tsx`, `typescript`, `esbuild`, plus a local `esbuild` in the project root
+- Redis (only when built with `-tags redis`)
 
 ## Installation
 
 ### From Source
 
 ```bash
-git clone https://github.com/pardnchiu/go-faas.git
-cd go-faas
-go build -o go-faas cmd/api/main.go
+git clone https://github.com/pardnchiu/HakoRun.git
+cd HakoRun
+npm install -g tsx typescript esbuild
+npm install esbuild
+make build
 ```
 
-### Using go install
+The binary lands at `bin/hako`.
+
+### Redis Storage
 
 ```bash
-go install github.com/pardnchiu/go-faas/cmd/api@latest
+make build redis
 ```
 
-### Install TypeScript Dependencies
+Equivalent to `go build -tags redis -o bin/hako ./cmd/api`.
 
-```bash
-npm install
-```
+> HakoRun resolves `internal/resource/wrapper.{py,js,ts}` against the working directory at startup, so start the binary from the project root; a standalone binary from `go install` cannot locate the wrappers.
 
-> On first launch, the program checks for `bwrap`, `node`, and `python3`. If any are missing, it attempts to install them via the system package manager.
+### Linux Dependency Auto-install
+
+On Linux, when `node`, `tsc`, `esbuild`, or `python3` is missing at startup, HakoRun installs `bubblewrap`, `nodejs`, `npm`, and `python3` through `sudo` and the system package manager:
+
+| Distribution | Package Manager |
+|--------------|-----------------|
+| Ubuntu, Debian | `apt` |
+| Rocky Linux, Alma Linux, Fedora, RedHat | `dnf` |
+| Arch Linux | `pacman` |
+| Alpine Linux | `apk` |
+
+Auto-install does not cover `tsc` or `esbuild`; install them first with `npm install -g typescript esbuild` so startup does not re-trigger the install. macOS skips the dependency check.
 
 ## Configuration
 
 ### Environment Variables
 
-Copy `.env.example` and fill in the values:
+The `Makefile` loads `.env` from the project root:
 
 ```bash
 cp .env.example .env
@@ -48,31 +64,48 @@ cp .env.example .env
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `HTTP_PORT` | No | `8080` | HTTP server port |
-| `MAX_CPUS` | No | `1` | Sandbox CPU quota (cores) |
-| `MAX_MEMORY` | No | `128M` | Sandbox memory ceiling |
-| `CODE_MAX_SIZE` | No | `262144` (256KB) | Maximum allowed code size in bytes |
-| `TIMEOUT_SCRIPT` | No | `30` | Script execution timeout in seconds |
-| `REDIS_HOST` | No | `localhost` | Redis host address |
-| `REDIS_PORT` | No | `6379` | Redis port |
-| `REDIS_PASSWORD` | No | empty | Redis password |
-| `REDIS_DB` | No | `0` | Redis database number |
-| `REDIS_TIMEOUT_SECONDS` | No | `5` | Redis connection timeout in seconds |
+| `HTTP_PORT` | No | `8080` | HTTP listen port |
+| `CODE_MAX_SIZE` | No | `262144` (256 KiB) | Request body byte limit for `/run` and `/run-now` |
+| `TIMEOUT_SCRIPT` | No | `30` | Script timeout in seconds; the effective deadline adds 5 seconds |
+| `MAX_CPUS` | No | `1` | CPU quota of `hakorun.slice` in cores (`CPUQuota = N × 100%`), Linux only |
+| `MAX_MEMORY` | No | `128M` | `MemoryMax` of `hakorun.slice` (swap fixed at 0), Linux only |
+| `REDIS_HOST` | No | `localhost` | Redis host (`-tags redis` only) |
+| `REDIS_PORT` | No | `6379` | Redis port (`-tags redis` only) |
+| `REDIS_PASSWORD` | No | empty | Redis password (`-tags redis` only) |
+| `REDIS_DB` | No | `0` | Redis database index (`-tags redis` only) |
+| `REDIS_TIMEOUT_SECONDS` | No | `5` | Redis dial/read/write timeout in seconds (`-tags redis` only) |
+
+### Storage Location
+
+| Backend | Build | Location |
+|---------|-------|----------|
+| ToriiDB | default | `~/.config/pardnchiu/hakorun` |
+| Redis | `-tags redis` | `REDIS_DB` on `REDIS_HOST:REDIS_PORT` |
+
+### systemd Slice (Linux)
+
+At startup HakoRun writes `~/.config/systemd/user/hakorun.slice`, then runs `systemctl --user daemon-reload` and `start`. A failure only logs a warning; the server still starts.
 
 ## Usage
 
 ### Start the Server
 
 ```bash
-./go-faas
+make run
 ```
+
+Or run the built binary from the project root:
+
+```bash
+./bin/hako
+```
+
+On `SIGINT` or `SIGTERM` the server shuts down gracefully within 5 seconds.
 
 ### Basic: Upload a Script
 
-Store a script in Redis and receive a version number:
-
 ```bash
-curl -X POST http://localhost:8080/upload \
+curl --fail-with-body -X POST http://localhost:8080/upload \
   -H "Content-Type: application/json" \
   -d '{
     "path": "math/add",
@@ -81,36 +114,22 @@ curl -X POST http://localhost:8080/upload \
   }'
 ```
 
-Response:
+Response (`version` is the Unix timestamp in seconds at upload time):
 
 ```json
 {
   "path": "math/add",
   "language": "python",
-  "version": 1739000000
+  "version": 1791273600
 }
 ```
 
-### Basic: Execute a Stored Script
-
-Run the latest version by path:
+### Basic: Run a Stored Script
 
 ```bash
-curl -X POST http://localhost:8080/run/math/add \
+curl --fail-with-body -X POST http://localhost:8080/run/math/add \
   -H "Content-Type: application/json" \
-  -d '{
-    "input": "{\"a\": 3, \"b\": 5}"
-  }'
-```
-
-Run a specific version:
-
-```bash
-curl -X POST "http://localhost:8080/run/math/add?version=1739000000" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "input": "{\"a\": 3, \"b\": 5}"
-  }'
+  -d '{"input": "{\"a\": 3, \"b\": 5}"}'
 ```
 
 Response:
@@ -122,12 +141,22 @@ Response:
 }
 ```
 
-### Advanced: Execute Code Immediately
+`/run` requires a JSON body; send `{}` when there is no input.
 
-Submit code for direct execution without storing:
+### Advanced: Pin a Version
 
 ```bash
-curl -X POST http://localhost:8080/run-now \
+curl --fail-with-body -X POST "http://localhost:8080/run/math/add?version=1791273600" \
+  -H "Content-Type: application/json" \
+  -d '{"input": "{\"a\": 3, \"b\": 5}"}'
+```
+
+A `version` that does not parse as an integer falls back to the latest version; a missing version returns `404`.
+
+### Advanced: Run Now (No Storage)
+
+```bash
+curl --fail-with-body -X POST http://localhost:8080/run-now \
   -H "Content-Type: application/json" \
   -d '{
     "language": "javascript",
@@ -145,30 +174,32 @@ Response:
 }
 ```
 
-### Advanced: SSE Streaming Mode
-
-Set `stream: true` to enable Server-Sent Events streaming output:
+### Advanced: SSE Streaming
 
 ```bash
-curl -X POST http://localhost:8080/run-now \
+curl -N -X POST http://localhost:8080/run-now \
   -H "Content-Type: application/json" \
   -d '{
     "language": "python",
-    "code": "import time\nfor i in range(5):\n    print(i)\n    time.sleep(0.5)\nreturn \"done\"",
+    "code": "import time\nfor i in range(3):\n    print(i)\n    time.sleep(0.5)\nreturn \"done\"",
     "input": "{}",
     "stream": true
   }'
 ```
 
-Streaming response format:
+Stream output:
 
 ```
-data: {"event":"log","data":"0","type":"text"}
+data: {"event":"log","data":0,"type":"number"}
 
-data: {"event":"log","data":"1","type":"text"}
+data: {"event":"log","data":1,"type":"number"}
+
+data: {"event":"log","data":2,"type":"number"}
 
 data: {"event":"result","data":"done","type":"string"}
 ```
+
+Each stdout line is pushed as `log` once the next line arrives, and the final line becomes `result`; any stderr write, timeout, or client disconnect kills the process and emits an `error` event. The server closes the connection after sending `result` or `error`.
 
 ## API Reference
 
@@ -176,88 +207,97 @@ data: {"event":"result","data":"done","type":"string"}
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/upload` | Upload a script to Redis |
-| `POST` | `/run/*targetPath` | Execute a stored script |
-| `POST` | `/run-now` | Execute submitted code immediately |
+| `POST` | `/upload` | Store a script as a new version |
+| `POST` | `/run/*targetPath` | Run a stored script (latest version by default) |
+| `POST` | `/run-now` | Run submitted code in the sandbox without storing it |
 
 ### POST /upload
 
-Upload and store a script in Redis, returning a version number.
-
-**Request Body:**
-
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `path` | `string` | Yes | Script access path (must not contain `..`) |
-| `code` | `string` | Yes | Code content |
-| `language` | `string` | Yes | Language (`python`, `javascript`, `typescript`) |
+| `path` | `string` | Yes | Script path; must not contain `..` |
+| `code` | `string` | Yes | Source code |
+| `language` | `string` | Yes | `python`, `javascript`, or `typescript` |
 
-**Response:**
+| Status | Body | Case |
+|--------|------|------|
+| `200` | `{"path", "language", "version"}` | Stored |
+| `400` | `Invalid request payload` | Missing field or malformed JSON |
+| `400` | `Invalid path` | `path` contains `..` or `language` is unsupported |
+| `500` | `Failed to save function` | Storage backend write failed |
 
-```json
-{
-  "path": "string",
-  "language": "string",
-  "version": 1739000000
-}
-```
+Two uploads to the same path within the same second share a version number, and the later code overwrites the earlier one.
 
 ### POST /run/*targetPath
 
-Fetch a script from Redis and execute it inside the sandbox.
+| Parameter | In | Type | Required | Description |
+|-----------|----|------|----------|-------------|
+| `version` | query | `int64` | No | Target version; omitted or non-integer means latest |
+| `input` | body | `string` | No | JSON string, exposed to the script as `event` / `input` |
+| `stream` | body | `bool` | No | `true` responds over SSE |
 
-**Query Parameters:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `version` | `int64` | No | Target version number; defaults to latest |
-
-**Request Body:**
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `input` | `string` | No | JSON-formatted input data, accessible as `event` in the script |
-| `stream` | `bool` | No | Enable SSE streaming output |
+| Status | Case |
+|--------|------|
+| `200` | Success (JSON or SSE) |
+| `400` | Body is not valid JSON or exceeds `CODE_MAX_SIZE` |
+| `404` | `script not found` or `assign version not found` |
+| `500` | Non-stream execution failed or timed out (`failed to run: ...`) |
 
 ### POST /run-now
 
-Submit code for direct sandbox execution without Redis storage.
-
-**Request Body:**
-
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `code` | `string` | Yes | Code content |
-| `language` | `string` | Yes | Language (`python`, `javascript`, `typescript`) |
-| `input` | `string` | No | JSON-formatted input data |
-| `stream` | `bool` | No | Enable SSE streaming output |
+| `code` | `string` | Yes | Source code; must not be blank |
+| `language` | `string` | Yes | `python`, `javascript`, or `typescript` |
+| `input` | `string` | No | JSON string input |
+| `stream` | `bool` | No | `true` responds over SSE |
+
+| Status | Case |
+|--------|------|
+| `200` | Success (JSON or SSE) |
+| `400` | Bad body, `unsupported language`, or `code is required` |
+| `500` | Non-stream execution failed or timed out |
 
 ### Response Format
 
-Standard responses auto-detect the return data type:
+Non-stream mode takes the last valid JSON line on stdout as the result; without one it returns the full output with Node.js warnings filtered out.
 
-| `type` | Description |
-|--------|-------------|
-| `string` | String value |
-| `number` | Numeric value |
-| `json` | JSON object or array |
-| `text` | Plain text (not valid JSON) |
+| `type` | Condition |
+|--------|-----------|
+| `string` | Result is a JSON string |
+| `number` | Result is a JSON number |
+| `json` | Result is a JSON object, array, boolean, or `null` |
+| `text` | Result is not valid JSON |
 
-### SSE Event Format
+### SSE Events
+
+Each event is `data: {"event", "data", "type"}`, with `type` following the rules above.
 
 | `event` | Description |
 |---------|-------------|
-| `log` | Intermediate script output (`print` / `console.log`) |
-| `result` | Final execution result |
-| `error` | Execution error message |
+| `log` | Intermediate stdout line |
+| `result` | Final stdout line (newlines replaced with spaces) |
+| `error` | Termination reason: stderr content, timeout, client disconnect, or non-zero exit |
 
-### Supported Languages
+### Script Runtime Contract
 
-| Language | Runtime | Extension | Global Variables Available in Script |
-|----------|---------|-----------|--------------------------------------|
-| Python | `python3` | `.py` | `event`, `input` |
-| JavaScript | `node` | `.js` | `event`, `input` |
-| TypeScript | `tsx` | `.ts` | `event`, `input` |
+| Language | Runtime | Script Globals | Result |
+|----------|---------|----------------|--------|
+| Python | `python3 -u` | `event`, `input` (both the parsed `input`) | Top-level `return` value, printed with `json.dumps` |
+| JavaScript | `node` (`vm`, wrapped in an async function) | `event`, `input` | Top-level `return` value (supports `await`), printed with `JSON.stringify` |
+| TypeScript | `tsx` (`esbuild` transpiles to CJS, then `vm` runs it) | `event`, `input` | Top-level `return` value or global `result` |
+
+### Sandbox Boundaries
+
+| Aspect | Linux (`systemd-run` + `bwrap`) | macOS (`sandbox-exec`) |
+|--------|----------------------------------|------------------------|
+| Filesystem | Read-only `/usr`, `/lib`, `/lib64`, and the wrapper; tmpfs `/tmp` and `/home/sandbox` | Read everywhere, write only under `$HOME` |
+| Network | Disabled (`--unshare-net`) | Allowed |
+| Privileges | `--unshare-all`, `--cap-drop ALL`, `--new-session`, `--die-with-parent` | Seatbelt profile based on `deny default` |
+| Resource caps | `hakorun.slice` (`MAX_CPUS`, `MAX_MEMORY`) | None |
+| Environment | Resets `HOME`, `PATH`, `TMPDIR`, `LANG`; unsets `LD_PRELOAD`, `LD_LIBRARY_PATH` | Inherits the server environment |
+
+Inside the Linux sandbox `PATH` is `/usr/local/bin:/usr/bin:/bin` and only `/usr` is mounted, so the global `tsx` must live under `/usr` (npm's default `/usr/local` prefix works). TypeScript runs additionally mount the project root read-only and use its `node_modules` as `NODE_PATH`.
 
 ***
 
